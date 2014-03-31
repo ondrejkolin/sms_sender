@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#!/usr/bin/python
 # -*- Mode: Python; coding: utf-8;
 import httplib 
 import urllib 
