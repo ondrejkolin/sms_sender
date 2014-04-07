@@ -7,6 +7,7 @@ import urllib2
 import time
 import gtk
 import gtk.glade
+import pango
 from history import History
 from contacts import Contacts
 DATABASE = expanduser("~") + "/.sms.db"
@@ -44,6 +45,9 @@ class sms_sender:
         ###
         self.number = self.builder.get_object("number")
         self.number.connect("changed", self.on_number_changed)
+        # Počítání znaků
+        self.charcounter = self.builder.get_object("charcounter")
+        self.message.get_buffer().connect("changed", self.on_message_changed)
         # Doplňování
         self.completion = gtk.EntryCompletion()
         self.store = gtk.TreeStore(str, str)
@@ -98,6 +102,19 @@ class sms_sender:
             self.progress_bar.set_fraction(1.00)
             return True
         return False
+    def on_message_changed(self, model):
+        text = self.message.get_buffer().get_text(self.message.get_buffer().get_start_iter(), self.message.get_buffer().get_end_iter())
+        chars = len(text)
+        if chars > 625:
+            self.message.get_buffer().set_text(text[:625])
+            self.alert(self.message, "Překročena maximální délka zprávy!")
+        label = "Napsáno %d/125" % (chars % 125)
+        if chars > 125:
+            label += "Počet zpráv %d/5" % (((chars - 1) / 125) + 1)
+            preformat = '<span foreground="blue">'
+            postformat= '</span>'
+            label = preformat + label + postformat
+        self.charcounter.set_markup(label)
     def on_number_changed(self, model):
         cislo = True
         try:
