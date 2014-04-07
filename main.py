@@ -135,13 +135,13 @@ class sms_sender:
         self.about_dialog.run()
         self.about_dialog.hide()
     def history_browsing(self, widget):
-        self.history_window = History_UI()
+        self.history_window = History_UI(parent=self)
         self.history_window.builder.get_object("history_dialog").show()
         if self.history_window.result:
           self.number.set_text(str(self.history_window.result[0]))
           self.message.get_buffer().set_text(self.history_window.result[1])
     def contact_browsing(self, widget):
-        self.contact_window = Contacts_UI()
+        self.contact_window = Contacts_UI(parent=self)
         
     def ok_clicked(self, widget):
         self.update_model(self.store)
@@ -172,6 +172,7 @@ class sms_sender:
             
 class Contacts_UI:
     def __init__(self, history=History(DATABASE), contacts=Contacts(DATABASE), parent=None):
+        self.parent = parent
         self.result = None
         self.history = history
         self.contacts = contacts
@@ -240,6 +241,9 @@ class Contacts_UI:
         if response:
             self.contacts.add(int(cislo.get_text()), name.get_text())
             self.treeview.set_model(self.update_model(self.store))
+            #If parent set i can regenerate database for whisperer
+            self.parent.update_model(self.parent.store)
+            self.update_model(self.store)
         name.set_text("")
         cislo.set_text("")
     def on_close_clicked(self, widget):
