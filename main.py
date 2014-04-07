@@ -1,13 +1,15 @@
 #!/usr/bin/python
 # -*- Mode: Python; coding: utf-8;
-import httplib 
-import urllib 
+import httplib
+from os.path import expanduser
+import urllib
 import urllib2
 import time
 import gtk
 import gtk.glade
 from history import History
 from contacts import Contacts
+DATABASE = expanduser("~") + "/.sms.db"
 def isInteger(number):
     ok = True
     try:
@@ -15,71 +17,10 @@ def isInteger(number):
     except ValueError:
         ok = False
     return ok
-class History_UI:
-    def __init__(self, history=History(), contacts=Contacts()):
-        self.result = None
-        self.history = history
-        self.contacts= contacts
-        self.builder = gtk.Builder()
-        self.builder.add_from_file("history.glade")
-        self.window = self.builder.get_object("history_dialog")
-        self.window.connect("destroy", self.on_cancel_clicked)
-        self.builder.get_object("tool_ok").connect("clicked", self.on_ok_clicked)
-        self.builder.get_object("tool_cancel").connect("clicked", self.on_cancel_clicked)
-        self.builder.get_object("clear_history").connect("clicked", self.on_clear_history_clicked)
-        self.ok = self.builder.get_object("ok")
-        self.ok.connect("clicked", self.on_ok_clicked)
-        self.cancel = self.builder.get_object("cancel")
-        self.cancel.connect("clicked", self.on_cancel_clicked)
-        self.treeview = self.builder.get_object("treeview")
-        self.store = gtk.TreeStore(str, str)
-        self.treeview.set_model(self.store)
-        self.treeview.set_model(self.update_model(self.store))
-        columns = ["Číslo","Text zprávy"]
-        for i in range(0,len(columns)):
-          column = gtk.TreeViewColumn(columns[i])
-          cell = gtk.CellRendererText()
-          column.pack_start(cell, True)
-          column.add_attribute(cell, 'text', i)
-          self.treeview.append_column(column)
-        self.treeview.set_cursor(0)
-    def update_model(self, model):
-        model.clear()
-        try:
-          for i in self.history.list_all():
-              model.append(None, [i[0], i[1]])
-        except TypeError:
-              print "No history stored"
-        return model
-    def on_ok_clicked(self, widget):
-        cursor = self.treeview.get_cursor()[0]
-        if cursor:
-            try:
-                cislo = int(self.treeview.get_model()[cursor[0]][0])
-            except ValueError:
-                cislo = Contacts().get_num(self.treeview.get_model()[cursor[0]][0])
-            text = self.treeview.get_model()[cursor[0]][1]
-            self.result = [cislo, text]
-        self.window.hide()
-
-    def on_cancel_clicked(self, widget):
-        self.window.hide()
-    def on_clear_history_clicked(self, widget):
-        dialog = gtk.MessageDialog(
-            buttons = gtk.BUTTONS_YES_NO,
-            message_format = "Chcete smazat veškerou historii, bez možnosti návratu?"
-        )
-        #+9 je tu proto, že mi dialog vrací "-8 na True" a "-9 na False"
-        #Takže to je Workaround :D
-        response = dialog.run() + 9
-        if response:
-          self.history.clear()
-        dialog.destroy()
-
 class sms_sender:
     def __init__(self):
-        self.history = History()
-        self.contacts = Contacts()
+        self.history = History(db_name=DATABASE)
+        self.contacts = Contacts(db_name=DATABASE)
         self.builder = gtk.Builder()
         self.builder.add_from_file("ui.glade")
         window = self.builder.get_object("window")
@@ -113,11 +54,22 @@ class sms_sender:
         self.completion.pack_start(name_cell)
         self.completion.add_attribute(name_cell, 'text', 1)
         self.number.set_completion(self.completion)
+        # About dialog
+        self.about_dialog = self.builder.get_object("aboutdialog")
+        self.builder.get_object("about").connect("activate", self.on_about_activate)
+        # Progress dialog
+        self.progress_dialog = self.builder.get_object("progressdialog")
+        self.progress_ok = self.builder.get_object("progressok")
+        self.progress_ok.connect("clicked", self.on_progressok_clicked)
+        self.progress_bar = self.builder.get_object("progressbar")
+        #gtkmainloop
         gtk.main()
     def send(self, target, what):
-        print "Sended"
-        return True
-        '''
+        self.progress_dialog.hide()
+        self.progress_dialog.show()
+        self.progress_ok.set_sensitive(False)
+        self.progress_bar.set_fraction(0.33)
+        self.progress_bar.set_text("Kontaktuji web")
         timestamp = int(time.time())
         data = {
             'timestamp' : timestamp,
@@ -128,22 +80,26 @@ class sms_sender:
             'textsms' : what,
             'cislo-prijemce' : target
         }
+        data = urllib.urlencode(data) 
+        print('http://www.poslatsms.cz/', data)
         try:
-            data = urllib.urlencode(data) 
-            print('http://www.poslatsms.cz/', data)   
-            req = urllib2.Request('http://www.poslatsms.cz/', data) 
+            req = urllib2.Request('http://www.poslatsms.cz/', data)
+            self.progress_bar.set_fraction(0.66)
+            self.progress_bar.set_text("Odesílám data")
             response = urllib2.urlopen(req)
             the_page = str(response.read())
-            if 'SMS zprávy přijaty k odeslání!' in the_page:
-                return True
-            return False
-        except:
-            return False
-        '''
+        except urllib2.error as e:
+            print "error", e
+            self.progress_bar.hide()
+        print the_page
+        if 'SMS zprávy přijaty k odeslání!' in the_page:
+            self.progress_bar.set_text("Hotovo")
+            self.progress_ok.set_sensitive(True)
+            self.progress_bar.set_fraction(1.00)
+            return True
+        return False
     def update_model(self, model):
-        model.clear()
         #GET FROM CONTACTS
-        #model.append(None, [str(733685973), "Ondra"])
         try:
           for i in self.contacts.list_all():
               model.append(None, [i[0], i[1]])
@@ -173,10 +129,14 @@ class sms_sender:
         choice = dialog.run()
         if choice != None:
             dialog.hide()
-        what.grab_focus()
+        if what:
+            what.grab_focus()
+    def on_about_activate(self, widget):
+        self.about_dialog.run()
+        self.about_dialog.hide()
     def history_browsing(self, widget):
         self.history_window = History_UI()
-        self.history_window.builder.get_object("history_dialog").run()
+        self.history_window.builder.get_object("history_dialog").show()
         if self.history_window.result:
           self.number.set_text(str(self.history_window.result[0]))
           self.message.get_buffer().set_text(self.history_window.result[1])
@@ -198,7 +158,7 @@ class sms_sender:
             self.alert(self.message, "Nelze odeslat prázdnou zprávu!")
             return 1
         if not(self.send(int(self.number.get_text()), self.text)):
-            self.alert(self, None, "Chyba při odesílání! Změna enginu poskytovatele?")
+            self.alert(None, "Chyba při odesílání! Změna enginu poskytovatele?")
         else:
             #self.info("Zpráva odeslána!")
             ###
@@ -207,12 +167,14 @@ class sms_sender:
                 self.history.add(int(self.number.get_text()), self.text)
             self.message.get_buffer().set_text("")
             self.number.set_text("")
+    def on_progressok_clicked(self,widget):
+        self.progress_dialog.hide()
             
 class Contacts_UI:
-    def __init__(self, history=History(), contacts=Contacts()):
+    def __init__(self, history=History(DATABASE), contacts=Contacts(DATABASE), parent=None):
         self.result = None
         self.history = history
-        self.contacts= contacts
+        self.contacts = contacts
         self.builder = gtk.Builder()
         self.builder.add_from_file("contacts.glade")
         self.window = self.builder.get_object("window")
@@ -295,6 +257,66 @@ class Contacts_UI:
         if response:
             self.contacts.remove(int(cislo), jmeno)
             self.treeview.set_model(self.update_model(self.store))
+        dialog.destroy()
+class History_UI:
+    def __init__(self, history=History(DATABASE), contacts=Contacts(DATABASE), parent=None):
+        self.result = None
+        self.history = history
+        self.contacts= contacts
+        self.builder = gtk.Builder()
+        self.builder.add_from_file("history.glade")
+        self.window = self.builder.get_object("history_dialog")
+        self.window.connect("destroy", self.on_cancel_clicked)
+        self.builder.get_object("tool_ok").connect("clicked", self.on_ok_clicked)
+        self.builder.get_object("tool_cancel").connect("clicked", self.on_cancel_clicked)
+        self.builder.get_object("clear_history").connect("clicked", self.on_clear_history_clicked)
+        self.ok = self.builder.get_object("ok")
+        self.ok.connect("clicked", self.on_ok_clicked)
+        self.cancel = self.builder.get_object("cancel")
+        self.cancel.connect("clicked", self.on_cancel_clicked)
+        self.treeview = self.builder.get_object("treeview")
+        self.store = gtk.TreeStore(str, str)
+        self.treeview.set_model(self.store)
+        self.treeview.set_model(self.update_model(self.store))
+        columns = ["Číslo","Text zprávy"]
+        for i in range(0,len(columns)):
+          column = gtk.TreeViewColumn(columns[i])
+          cell = gtk.CellRendererText()
+          column.pack_start(cell, True)
+          column.add_attribute(cell, 'text', i)
+          self.treeview.append_column(column)
+        self.treeview.set_cursor(0)
+    def update_model(self, model):
+        model.clear()
+        try:
+          for i in self.history.list_all():
+              model.append(None, [i[0], i[1]])
+        except TypeError:
+              print "No history stored"
+        return model
+    def on_ok_clicked(self, widget):
+        cursor = self.treeview.get_cursor()[0]
+        if cursor:
+            try:
+                cislo = int(self.treeview.get_model()[cursor[0]][0])
+            except ValueError:
+                cislo = Contacts(db_name=DATABASE).get_num(self.treeview.get_model()[cursor[0]][0])
+            text = self.treeview.get_model()[cursor[0]][1]
+            self.result = [cislo, text]
+        self.window.hide()
+
+    def on_cancel_clicked(self, widget):
+        self.window.hide()
+    def on_clear_history_clicked(self, widget):
+        dialog = gtk.MessageDialog(
+            buttons = gtk.BUTTONS_YES_NO,
+            message_format = "Chcete smazat veškerou historii, bez možnosti návratu?"
+        )
+        #+9 je tu proto, že mi dialog vrací "-8 na True" a "-9 na False"
+        #Takže to je Workaround :D
+        response = dialog.run() + 9
+        if response:
+          self.history.clear()
         dialog.destroy()
 
 sms_sender()
