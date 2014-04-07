@@ -43,11 +43,11 @@ class sms_sender:
         self.check_box = self.builder.get_object("history_check")
         ###
         self.number = self.builder.get_object("number")
+        self.number.connect("changed", self.on_number_changed)
         # Doplňování
         self.completion = gtk.EntryCompletion()
         self.store = gtk.TreeStore(str, str)
         self.completion.set_model(self.store)
-        self.update_model(self.store)
         # Model creating
         self.completion.set_text_column(0)
         name_cell = gtk.CellRendererText()
@@ -98,11 +98,22 @@ class sms_sender:
             self.progress_bar.set_fraction(1.00)
             return True
         return False
-    def update_model(self, model):
+    def on_number_changed(self, model):
+        cislo = True
+        try:
+            text = int(self.number.get_text())
+        except ValueError:
+            cislo = False
+        self.store.clear()
+        self.update_model(self.store, cislo)
+    def update_model(self, model, number):
         #GET FROM CONTACTS
         try:
           for i in self.contacts.list_all():
-              model.append(None, [i[0], i[1]])
+              if number:
+                  model.append(None, [i[0], i[1]])
+              else:
+                  model.append(None, [i[1], i[0]])
         except TypeError:
             print "No contacts stored"
         #GET FROM HISTORY
