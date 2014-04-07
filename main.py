@@ -69,6 +69,7 @@ class sms_sender:
         #gtkmainloop
         gtk.main()
     def send(self, target, what):
+        print "Odesílám %s do %d" % (what, target)
         self.progress_dialog.hide()
         self.progress_dialog.show()
         self.progress_ok.set_sensitive(False)
@@ -105,13 +106,18 @@ class sms_sender:
     def on_message_changed(self, model):
         text = self.message.get_buffer().get_text(self.message.get_buffer().get_start_iter(), self.message.get_buffer().get_end_iter())
         chars = len(text)
+        colour = "darkgreen"
         if chars > 625:
             self.message.get_buffer().set_text(text[:625])
             self.alert(self.message, "Překročena maximální délka zprávy!")
+            text = self.message.get_buffer().get_text(self.message.get_buffer().get_start_iter(), self.message.get_buffer().get_end_iter())
+            chars = len(text)
+            colour = "red"
         label = "Napsáno %d/125" % (chars % 125)
         if chars > 125:
             label += "Počet zpráv %d/5" % (((chars - 1) / 125) + 1)
-            preformat = '<span foreground="blue">'
+            
+            preformat = '<span foreground="%s">' % colour
             postformat= '</span>'
             label = preformat + label + postformat
         self.charcounter.set_markup(label)
@@ -172,7 +178,7 @@ class sms_sender:
         self.contact_window = Contacts_UI(parent=self)
         
     def ok_clicked(self, widget):
-        self.update_model(self.store)
+        '''
         try:
             int(self.number.get_text())
             if (len(self.number.get_text()) != 9):
@@ -181,20 +187,32 @@ class sms_sender:
         except ValueError:
             self.alert(self.number, "Číslo příjemce není 9 místné číslo")
             return 1
-        self.text = self.message.get_buffer().get_text(self.message.get_buffer().get_start_iter(), self.message.get_buffer().get_end_iter())
-        if (self.text == ""):
+        '''
+        if isInteger(self.number.get_text()):
+            cislo = int(self.number.get_text())
+            if (len(self.number.get_text()) != 9):
+                self.alert(self.nubmer, "Číslo příjemce není 9 místné číslo")
+                return 1
+        else:
+            cislo = self.contacts.get_num(self.number.get_text())
+            if cislo == None:
+                self.alert(self.number, "Uvedený kontakt nebyl nalezen")
+                return 1
+        text = self.message.get_buffer().get_text(self.message.get_buffer().get_start_iter(), self.message.get_buffer().get_end_iter())
+        if (text == ""):
             self.alert(self.message, "Nelze odeslat prázdnou zprávu!")
             return 1
-        if not(self.send(int(self.number.get_text()), self.text)):
-            self.alert(None, "Chyba při odesílání! Změna enginu poskytovatele?")
-        else:
-            #self.info("Zpráva odeslána!")
-            ###
-            # ukládání do historie
-            if (self.check_box.get_active()):
-                self.history.add(int(self.number.get_text()), self.text)
-            self.message.get_buffer().set_text("")
-            self.number.set_text("")
+        while text <> "":
+            if not(self.send(cislo, text[:125])):
+                self.alert(None, "Chyba při odesílání! Změna enginu poskytovatele?")
+                text = text[125:]
+            else:
+                # ukládání do historie
+                if (self.check_box.get_active()):
+                    self.history.add(cislo, text[:125])
+                text = text[125:]
+                self.message.get_buffer().set_text("")
+                self.number.set_text("")
     def on_progressok_clicked(self,widget):
         self.progress_dialog.hide()
             
