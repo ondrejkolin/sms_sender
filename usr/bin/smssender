@@ -1,0 +1,4 @@
+#/usr/share/main.py
+cd ../share/
+./main.py
+

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Aces
+Comment=Compile and Execute C programs
+Categories=Internet;Office;
+Exec=/usr/bin/smssender
+Icon=/usr/share/smssender/icon.png
+Terminal=false
+Type=Application
+StartupNotify=true
