@@ -358,15 +358,15 @@ class History_UI:
             except ValueError:
                 cislo = Contacts(db_name=DATABASE).get_num(self.treeview.get_model()[cursor[0]][0])
             text = self.treeview.get_model()[cursor[0]][1]
-        dialog = gtk.MessageDialog(
-            buttons = gtk.BUTTONS_YES_NO,
-            message_format = "Chcete smazat z historie SMS na %d s textem %s" % (cislo, text)
-            )
-        response = dialog.run()
-        if response:
-            self.history.remove(cislo, text)
-            self.update_model(self.store)
-        dialog.destroy()
+            dialog = gtk.MessageDialog(
+                buttons = gtk.BUTTONS_YES_NO,
+                message_format = "Chcete smazat z historie SMS na %d s textem %s" % (cislo, text)
+                )
+            response = dialog.run()
+            if response:
+                self.history.remove(cislo, text)
+                self.update_model(self.store)
+            dialog.destroy()
         
             
 

@@ -1,6 +1,6 @@
 echo "Pokud nemáte administrátorská oprávnění skript selže!"
 echo "Zadejte vaše heslo pro instalaci smssender"
-sudo apt-get install sqlite python-sqlite glade
+sudo apt-get install sqlite python-sqlite 
 sudo mkdir /usr/bin/smssender
 echo "Probíhá registrace do /usr/bin"
 sudo cp ./usr/bin/smssender /usr/bin/smssender
