@@ -7,4 +7,6 @@ sudo cp ./usr/bin/smssender /usr/bin/smssender
 sudo mkdir /usr/share/smssender
 echo "Probíhá kopírování knihoven"
 sudo cp -r ./usr/share/smssender /usr/share/smssender
+echo "Vytváření zástupců"
+sudo cp ./usr/share/applications/* /usr/share/applications/
 
